@@ -28,6 +28,7 @@ configurar_leds:
     li t0, GPIO_ENABLE_W1TS_REG
     li t1, GPIO3_LED1 | GPIO4_LED3 | GPIO10_LED2
     sw t1, 0(t0)
+    ret
 apagar_leds:
     li t1, GPIO3_LED1 | GPIO4_LED3 | GPIO10_LED2
     li t2, GPIO_OUT_W1TS_REG

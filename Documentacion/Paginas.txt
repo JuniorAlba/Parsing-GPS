@@ -1,0 +1,24 @@
+Datasheet de la ESP32-C3
+PAGINA 20-24		Se detallan las funciones de cada pin GPIO
+
+Manual de la ESP32-C3
+PAGINA 98		Direcciones de los puertos UART y los pines GPIO
+PAGINA 568		Direcciones de los registros de control y configuración del puerto UART
+PAGINA 585 		Descripción del registro UART_STATUS
+PAGINA 176		Direcciones de los registros de configuración de los pines GPIO
+
+Manual del GPS
+PAGINA 19		Posibles configuraciones para el puerto UART de acuerdo al protocolo NMEA, protocolo con el que se envía la información
+PAGINA 61		Estructura de las tramas enviadas por el modulo
+PAGINA 68		Estructura de la trama para obtener las coordenadas y la altitud
+PAGINA 78		Estructura de la trama para obtener la velocidad
+
+Universal Asynchronous Receiver/Transmitter (UART)
+https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/peripherals/uart.html#_CPPv411uart_port_t
+Explica el paso a paso para establecer comunicación entre la ESP32-C3 y el puerto UART
+A demás muestra los comandos necesarios para configurar el puerto
+
+
+https://docs.espressif.com/projects/esp-idf/en/stable/esp32/index.html
+Documentación del software ESP-IDF (Entorno de desarrollo de IoT)
+

@@ -17,7 +17,9 @@ extern int info_gps(void);
 void obtener_campo_trama(const char *trama, int numero_coma, char *resultado) {
     int comas_actuales = 0;
     int i = 0, j = 0;
-    while (trama[i] != '\0') { 
+    //El dato que buscamos se encuentra antes del fin de la cadena y antes del checksum
+    //(el checksum esta delimitado por el caracter *)
+    while (trama[i] != '\0' && trama[i] != '*') {
         if (trama[i] == ',') {
             comas_actuales++;
         } else if (comas_actuales == numero_coma) {
@@ -28,6 +30,7 @@ void obtener_campo_trama(const char *trama, int numero_coma, char *resultado) {
         }
         i++;
     }
+    resultado[j]= '\0';
 }
 char mostrar_menu_y_esperar(void) {
     char opcion = '0';
@@ -55,8 +58,8 @@ char mostrar_menu_y_esperar(void) {
 
 
 void mostrar_opcion(char opcion){
-    char buffer_linea[128]; // Nuestro "balde" de 100 letras
-    int indice = 0;         // El casillero por el que vamos
+    char buffer_linea[128];
+    int indice = 0;
     while(true) {
         int letra;
 
@@ -69,30 +72,38 @@ void mostrar_opcion(char opcion){
 
                 //$GPGGA,hhmmss.ss,Latitude,N,Longitude,E,FS,NoSV,HDOP,msl,m,Altref,m,DiffAge,DiffStation*cs<CR><LF>
                 if (strstr(buffer_linea, "$GPGGA") && opcion=='1') {
-                    char Latitud[100],Longitud[100];
+                    char Latitud[20] = "",Longitud[20] = "", dir_Latitud[2] = "", dir_Longitud[2] = "";
                     obtener_campo_trama(buffer_linea,2,Latitud);
+                    obtener_campo_trama(buffer_linea,3,dir_Latitud);
                     obtener_campo_trama(buffer_linea,4,Longitud);
-                    printf("Aca esta la Longitud Oeste: %.3s grados y %s minutos \n", Longitud, Longitud+3);
-                    printf("Aca esta la Latitud Sur: %.2s grados y %s minutos", Latitud, Latitud+2);
+                    obtener_campo_trama(buffer_linea,5,dir_Longitud);
+                    printf("Aca esta la Longitud %s: %.3s grados y %s minutos \n",dir_Longitud, Longitud, Longitud+3);
+                    printf("Aca esta la Latitud %s: %.2s grados y %s minutos",dir_Latitud, Latitud, Latitud+2);
                     return;
                 }
                 //$GPGGA,hhmmss.ss,Latitude,N,Longitude,E,FS,NoSV,HDOP,msl,m,Altref,m,DiffAge,DiffStation*cs<CR><LF>
                 else if (strstr(buffer_linea, "$GPGGA") && opcion=='2') {
-                    char Altitud[100];
+                    char Altitud[20] = "";
                     obtener_campo_trama(buffer_linea,9,Altitud);
-                    printf("Aca esta la altitud: %s\n", Altitud);
+                    printf("Aca esta la altitud: %s metros\n", Altitud);
                     return;
                 }
                 //$GPVTG,cogt,T,cogm,M,sog,N,kph,K,mode*cs<CR><LF>
                 else if (strstr(buffer_linea, "$GPVTG") && opcion=='3') {
-                    char Velocidad[100];
+                    char Velocidad[20] = "";
                     obtener_campo_trama(buffer_linea,7,Velocidad);
-                    printf("Aca esta la velocidad: %s\n", Velocidad);
+                    printf("Aca esta la velocidad: %s km/h\n", Velocidad);
                     return;
                 }
                 indice = 0;
             }
-            else{
+
+            //Si el caracter leido no es \n entonces la guardamos en la cadena de la linea
+            //solo si la cadena no llego a su maxima capacidad, las lineas que suelta el gps
+            //deberian ser de menos de 128 caracteres, pero si se da el caso de que una linea sea
+            //mayor, en ese caso, evitamos el desbordamiento
+            //ademas dejo espacio para el caracter de fin de cadena
+            else if(indice < 127){
                 buffer_linea[indice] = (char)letra;
                 indice++;
             }
@@ -103,19 +114,35 @@ void mostrar_opcion(char opcion){
 }
 void app_main(void)
 {
-    //CONFIGURACION PUERTO UART1
+    // CONFIGURACION DEL PUERTO SERIE (UART1) PARA EL MODULO GPS
+
+    // 1. Instalación del driver del sistema operativo (ESP-IDF)
+    // Parámetros: Puerto 1
+    //Buffer de Recepción RAM: 256 bytes
+    //Buffer de Transmisión: 0 (solo recibimos datos)
+    // Event Queue: 0 (desactivada) | Puntero a Queue: NULL | Flags de Interrupción: 0 (por defecto) -> parametros destinados a interrupciones
+    uart_driver_install(UART_NUM_1, 256, 0, 0, NULL, 0);
+
+    // 2. Estructura de parametros necesaria para configurar UART1
     uart_config_t uart1_config = {
-        .baud_rate = 9600,
-        .data_bits = UART_DATA_8_BITS,
-        .parity    = UART_PARITY_DISABLE,
-        .stop_bits = UART_STOP_BITS_1,
-        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
-        .source_clk = UART_SCLK_APB,
+        .baud_rate = 9600,                     // Velocidad de transmisión del GPS
+        .data_bits = UART_DATA_8_BITS,         // 8 bits por carácter (ASCII)
+        .parity    = UART_PARITY_DISABLE,      // Sin bit de comprobación de errores (Protocolo 8N1)
+        .stop_bits = UART_STOP_BITS_1,         // 1 bit de parada para marcar el final de cada carácter
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE, // Sin control de flujo por hardware (el gps solo tiene pines RX y TX)
+        .source_clk = UART_SCLK_APB,           // Utilizamos el reloj destinado a manejar perifericos
     };
 
-
+    // 3. Aplicamos la configuracion al puerto
     uart_param_config(UART_NUM_1, &uart1_config);
+
+    // 4. Conectamos internamente la UART1 a los pines de la placa ESP32-C3:
+    // Puerto | Pin TX: GPIO 1 | Pin RX: GPIO 0 | RTS: No cambiar | CTS: No cambiar
     uart_set_pin(UART_NUM_1, 1, 0, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+
+    //Debido a que necesitamos 5 pines GPIO y, la placa solo proporciona 4 pines libres
+    //de manera nativa, le solicitamos que libere un pin destinado a JTAG, destinado a depuracion por hardware,
+    //para fines de este trabajo practico no es necesario depurar a ese nivel.
     gpio_reset_pin(4);
 
 
