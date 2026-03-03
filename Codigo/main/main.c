@@ -4,6 +4,7 @@
 #include "driver/gpio.h"
 #include "driver/uart.h"
 #include <string.h>
+#include <stdlib.h>
 
 extern void configurar_leds(void);
 extern void apagar_leds(void);
@@ -13,6 +14,7 @@ extern void prender_led3(void);
 extern void apagar_led1(void);
 extern void apagar_led2(void);
 extern int info_gps(void);
+
 
 void obtener_campo_trama(const char *trama, int numero_coma, char *resultado) {
     int comas_actuales = 0;
@@ -49,7 +51,7 @@ char mostrar_menu_y_esperar(void) {
 
         // Filtramos para que solo acepte 1, 2 o 3
         if (opcion == '1' || opcion == '2' || opcion == '3') {
-            printf("\n\n>>> Opcion [%c] recibida correctamente.\n", opcion);
+            printf(">>> Opcion [%c] recibida correctamente.\n", opcion);
             return opcion;
         }
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -70,21 +72,35 @@ void mostrar_opcion(char opcion){
 
                 buffer_linea[indice] = '\0';
 
-                //$GPGGA,hhmmss.ss,Latitude,N,Longitude,E,FS,NoSV,HDOP,msl,m,Altref,m,DiffAge,DiffStation*cs<CR><LF>
+                //$GPGGA,hhmmss.ss,Latitude,N,Longitude,E,Fix,NoSV,HDOP,msl,m,Altref,m,DiffAge,DiffStation*cs<CR><LF>
                 if (strstr(buffer_linea, "$GPGGA") && opcion=='1') {
+
+
                     char Latitud[20] = "",Longitud[20] = "", dir_Latitud[2] = "", dir_Longitud[2] = "";
                     obtener_campo_trama(buffer_linea,2,Latitud);
                     obtener_campo_trama(buffer_linea,3,dir_Latitud);
                     obtener_campo_trama(buffer_linea,4,Longitud);
                     obtener_campo_trama(buffer_linea,5,dir_Longitud);
-                    printf("Aca esta la Longitud %s: %.3s grados y %s minutos \n",dir_Longitud, Longitud, Longitud+3);
-                    printf("Aca esta la Latitud %s: %.2s grados y %s minutos",dir_Latitud, Latitud, Latitud+2);
+                    //Si el gps todavia no tiene señal vuelvo al inicio del bucle y que siga buscando tramas
+                    if(Latitud[0] == '\0' || Longitud[0]== '\0' || dir_Latitud[0]=='\0' || dir_Longitud[0]== '\0'){
+                        indice = 0;
+                        continue;
+                    }
+                    //Solo para depurar la salida y que no se muestren caracteres demas
+                    int gradoLong = (int)strtol(Longitud,NULL,10)/100;
+                    int gradoLat = (int)strtol(Latitud,NULL,10)/100;
+                    printf("Aca esta la Longitud %s: %d grados y %s minutos \n",dir_Longitud, gradoLong, Longitud+3);
+                    printf("Aca esta la Latitud %s: %d grados y %s minutos \n",dir_Latitud, gradoLat, Latitud+2);
                     return;
                 }
                 //$GPGGA,hhmmss.ss,Latitude,N,Longitude,E,FS,NoSV,HDOP,msl,m,Altref,m,DiffAge,DiffStation*cs<CR><LF>
                 else if (strstr(buffer_linea, "$GPGGA") && opcion=='2') {
                     char Altitud[20] = "";
                     obtener_campo_trama(buffer_linea,9,Altitud);
+                    if(Altitud[0] == '\0'){
+                        indice = 0;
+                        continue;
+                    }
                     printf("Aca esta la altitud: %s metros\n", Altitud);
                     return;
                 }
@@ -92,6 +108,10 @@ void mostrar_opcion(char opcion){
                 else if (strstr(buffer_linea, "$GPVTG") && opcion=='3') {
                     char Velocidad[20] = "";
                     obtener_campo_trama(buffer_linea,7,Velocidad);
+                    if(Velocidad[0] == '\0'){
+                        indice = 0;
+                        continue;
+                    }
                     printf("Aca esta la velocidad: %s km/h\n", Velocidad);
                     return;
                 }
@@ -138,25 +158,25 @@ void app_main(void)
 
     // 4. Conectamos internamente la UART1 a los pines de la placa ESP32-C3:
     // Puerto | Pin TX: GPIO 1 | Pin RX: GPIO 0 | RTS: No cambiar | CTS: No cambiar
-    uart_set_pin(UART_NUM_1, 1, 0, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    uart_set_pin(UART_NUM_1, -1, 0, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
 
-    //Debido a que necesitamos 5 pines GPIO y, la placa solo proporciona 4 pines libres
-    //de manera nativa, le solicitamos que libere un pin destinado a JTAG, destinado a depuracion por hardware,
-    //para fines de este trabajo practico no es necesario depurar a ese nivel.
-    gpio_reset_pin(4);
+    // //Debido a que necesitamos 5 pines GPIO y, la placa solo proporciona 4 pines libres
+    // //de manera nativa, le solicitamos que libere un pin destinado a JTAG, destinado a depuracion por hardware,
+    // //para fines de este trabajo practico no es necesario depurar a ese nivel.
+    // gpio_reset_pin(4);
 
-
+    configurar_leds();
     while(true){
-        configurar_leds();
-        char opcion = mostrar_menu_y_esperar();
-        vTaskDelay(pdMS_TO_TICKS(1000));
         apagar_leds();
+        char opcion = mostrar_menu_y_esperar();
         prender_led1();
         vTaskDelay(pdMS_TO_TICKS(1000));
         apagar_led1();
         prender_led2();
+        printf("Obteniendo informacion del modulo GPS...\n");
         vTaskDelay(pdMS_TO_TICKS(1000));
         mostrar_opcion(opcion);
+        printf("Informacion obtenida correctamente \n");
         apagar_led2();
         prender_led3();
         vTaskDelay(pdMS_TO_TICKS(1000));
