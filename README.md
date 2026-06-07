@@ -59,17 +59,18 @@ formateado. Tres LEDs indican el estado del proceso: solicitud recibida → busc
 ## Estructura del proyecto
 
 ```
-Parsing-GPS/
+GPS-Embebido-riscv-assembly/
 ├── Codigo/
 │   ├── main/
-│   │   ├── main.c          # Application layer: parser, menu, control flow
-│   │   └── main.S          # Assembly layer: UART FIFO polling, GPIO control
+│   │   ├── main.c          # Capa de aplicación: parser, menú, lógica
+│   │   └── main.S          # Capa de hardware: UART FIFO polling, GPIO
 │   ├── CMakeLists.txt
 │   └── sdkconfig
 ├── Documentacion/
-│   └── Informe_trabajo_final_coloquio.pdf
-├── Trabajo Práctico.pdf    # Original assignment specification
-└── *.png                   # Register map reference diagrams
+├── Registros/              # Diagramas de registros GPIO y UART
+├── Informe trabajo final coloquio.pdf
+├── Trabajo Práctico.pdf    # Consigna original
+└── presentacion.html
 ```
 
 ## Build & Flash
